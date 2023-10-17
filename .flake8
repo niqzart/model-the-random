@@ -41,3 +41,6 @@ extend-ignore =
   WPS602  # @staticmethod
   WPS604  # some cringe /w banning constructions, including `pass`
   WPS605  # methods with no arguments
+
+  # project specific
+  WPS421 T201  # prints are needed for CLI
