@@ -6,6 +6,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import IO, Any, Final, Literal
 
+from matplotlib import pyplot as plt
+
 ROOT_FOLDER: Path = Path.cwd()
 if ROOT_FOLDER.name == "app":
     ROOT_FOLDER = ROOT_FOLDER.parent
@@ -170,3 +172,26 @@ if __name__ == "__main__":
         for sample_size in SAMPLE_SIZES[:-1]
     ]
     save_table1_to_csv(partial_analyzers, full_analyzer)
+
+    sequence_of_floats = [float(element) for element in full_sequence]
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(sequence_of_floats)
+    plt.xlim(0, len(sequence_of_floats))
+    plt.xlabel("Number")
+    plt.ylabel("Value")
+    plt.title("Plot")
+    plt.savefig(ROOT_FOLDER / "out" / "line-graph.png")
+    plt.cla()
+
+    plt.hist(
+        x=sequence_of_floats,
+        bins="auto",
+        rwidth=0.85,
+        range=(0, max(sequence_of_floats)),
+    )
+    plt.grid(axis="y")
+    plt.xlabel("Value")
+    plt.ylabel("Count")
+    plt.title("Histogram")
+    plt.savefig(ROOT_FOLDER / "out" / "histogram.png")
