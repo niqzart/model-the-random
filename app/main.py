@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import csv
 from decimal import Decimal
 from pathlib import Path
@@ -64,18 +66,64 @@ class SequenceSampleAnalyzer:
         )
 
 
+class RelativeSequenceSampleAnalyzer(SequenceSampleAnalyzer):
+    @classmethod
+    def calculate_relative(cls, current: Decimal, base: Decimal) -> Decimal:
+        return (abs(current - base) / base) * 100
+
+    def __init__(
+        self, sequence_sample: list[Decimal], relative_to: SequenceSampleAnalyzer
+    ) -> None:
+        super().__init__(sequence_sample)
+        self.relative_to = relative_to
+
+        self.relative_mean = self.calculate_relative(self.mean, relative_to.mean)
+        self.relative_dispersion = self.calculate_relative(
+            self.dispersion, relative_to.dispersion
+        )
+        self.relative_standard_deviation = self.calculate_relative(
+            self.standard_deviation, relative_to.standard_deviation
+        )
+        self.relative_coefficient_of_variation = self.calculate_relative(
+            self.coefficient_of_variation, relative_to.coefficient_of_variation
+        )
+        self.relative_confidences: dict[ConfidenceLevel, Decimal] = {
+            confidence_level: self.calculate_relative(
+                self.confidences[confidence_level],
+                relative_to.confidences[confidence_level],
+            )
+            for confidence_level in self.confidence_to_coefficient.keys()
+        }
+
+
 if __name__ == "__main__":
     full_sequence = load_sequence_from_file()
     if len(full_sequence) != SAMPLE_SIZES[-1]:
         raise ValueError(f"Sequence should be {SAMPLE_SIZES[-1]} numbers")
 
-    for sample_size in SAMPLE_SIZES:
-        analyzer = SequenceSampleAnalyzer(full_sequence[:sample_size])
+    full_analyzer = SequenceSampleAnalyzer(full_sequence)
+    for sample_size in SAMPLE_SIZES[:-1]:
+        analyzer = RelativeSequenceSampleAnalyzer(
+            full_sequence[:sample_size], full_analyzer
+        )
         print(
             analyzer.size,
             analyzer.mean,
+            analyzer.relative_mean,
             analyzer.dispersion,
+            analyzer.relative_dispersion,
             analyzer.standard_deviation,
+            analyzer.relative_standard_deviation,
             analyzer.coefficient_of_variation,
+            analyzer.relative_coefficient_of_variation,
             analyzer.confidences,
+            analyzer.relative_confidences,
         )
+    print(
+        full_analyzer.size,
+        full_analyzer.mean,
+        full_analyzer.dispersion,
+        full_analyzer.standard_deviation,
+        full_analyzer.coefficient_of_variation,
+        full_analyzer.confidences,
+    )
