@@ -1,3 +1,4 @@
+import csv
 from decimal import Decimal
 from pathlib import Path
 from typing import Final
@@ -11,7 +12,7 @@ SAMPLE_SIZES: Final[tuple[int, ...]] = (10, 20, 50, 100, 200, 300)
 
 def load_sequence_from_file() -> list[Decimal]:
     with (ROOT_FOLDER / "data" / "sequence.csv").open(encoding="utf-8") as f:
-        return [Decimal(line) for line in f.read().strip().split("\n")]
+        return [Decimal(row[0]) for row in csv.reader(f)]
 
 
 def calculate_sample_mean(sequence: list[Decimal]) -> Decimal:
