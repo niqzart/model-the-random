@@ -159,22 +159,7 @@ def save_table1_to_csv(
         )
 
 
-if __name__ == "__main__":
-    full_sequence = load_sequence_from_file()
-    if len(full_sequence) != SAMPLE_SIZES[-1]:
-        raise ValueError(f"Sequence should be {SAMPLE_SIZES[-1]} numbers")
-
-    (ROOT_FOLDER / "out").mkdir(exist_ok=True)
-
-    full_analyzer: SequenceSampleAnalyzer = SequenceSampleAnalyzer(full_sequence)
-    partial_analyzers: list[RelativeSequenceSampleAnalyzer] = [
-        RelativeSequenceSampleAnalyzer(full_sequence[:sample_size], full_analyzer)
-        for sample_size in SAMPLE_SIZES[:-1]
-    ]
-    save_table1_to_csv(partial_analyzers, full_analyzer)
-
-    sequence_of_floats = [float(element) for element in full_sequence]
-
+def plot_line_graph(sequence_of_floats: list[float]) -> None:
     plt.figure(figsize=(10, 5))
     plt.plot(sequence_of_floats)
     plt.xlim(0, len(sequence_of_floats))
@@ -184,6 +169,8 @@ if __name__ == "__main__":
     plt.savefig(ROOT_FOLDER / "out" / "line-graph.png")
     plt.cla()
 
+
+def plot_histogram(sequence_of_floats: list[float]) -> None:
     plt.hist(
         x=sequence_of_floats,
         bins="auto",
@@ -195,3 +182,25 @@ if __name__ == "__main__":
     plt.ylabel("Count")
     plt.title("Histogram")
     plt.savefig(ROOT_FOLDER / "out" / "histogram.png")
+    plt.cla()
+
+
+if __name__ == "__main__":
+    # setup
+    (ROOT_FOLDER / "out").mkdir(exist_ok=True)
+    full_sequence = load_sequence_from_file()
+    if len(full_sequence) != SAMPLE_SIZES[-1]:
+        raise ValueError(f"Sequence should be {SAMPLE_SIZES[-1]} numbers")
+
+    # analyze source sequence
+    full_analyzer: SequenceSampleAnalyzer = SequenceSampleAnalyzer(full_sequence)
+    partial_analyzers: list[RelativeSequenceSampleAnalyzer] = [
+        RelativeSequenceSampleAnalyzer(full_sequence[:sample_size], full_analyzer)
+        for sample_size in SAMPLE_SIZES[:-1]
+    ]
+    save_table1_to_csv(partial_analyzers, full_analyzer)
+
+    # plot source sequence
+    sequence_of_floats = [float(element) for element in full_sequence]
+    plot_line_graph(sequence_of_floats)
+    plot_histogram(sequence_of_floats)
