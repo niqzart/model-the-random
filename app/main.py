@@ -1,7 +1,7 @@
 import csv
 from decimal import Decimal
 from pathlib import Path
-from typing import Final
+from typing import Final, Literal
 
 ROOT_FOLDER: Path = Path.cwd()
 if ROOT_FOLDER.name == "app":
@@ -15,42 +15,53 @@ def load_sequence_from_file() -> list[Decimal]:
         return [Decimal(row[0]) for row in csv.reader(f)]
 
 
-def calculate_sample_mean(sequence: list[Decimal]) -> Decimal:
-    return Decimal(sum(sequence) / len(sequence))
+ConfidenceLevel = Literal["0.90", "0.95", "0.99"]
 
 
-def calculate_sample_dispersion(
-    sequence: list[Decimal], sample_mean: Decimal
-) -> Decimal:
-    normalized_sum = sum((element - sample_mean) ** 2 for element in sequence)
-    return Decimal(normalized_sum / (len(sequence) - 1))
+class SequenceSampleAnalyzer:
+    confidence_to_coefficient: dict[ConfidenceLevel, Decimal] = {
+        "0.90": Decimal("1.645"),
+        "0.95": Decimal("1.960"),
+        "0.99": Decimal("2.576"),
+    }
 
+    def __init__(self, sequence_sample: list[Decimal]) -> None:
+        self.sequence_sample = sequence_sample
+        self.size = len(sequence_sample)
 
-def calculate_sample_standard_deviation(sample_dispersion: Decimal) -> Decimal:
-    return sample_dispersion.sqrt()
+        self.mean = self.calculate_mean()
+        self.dispersion = self.calculate_dispersion()
+        self.standard_deviation = self.calculate_standard_deviation()
+        self.coefficient_of_variation = self.calculate_coefficient_of_variation()
 
+        self.confidences: dict[ConfidenceLevel, Decimal] = {
+            confidence_level: self.calculate_confidence_interval(confidence_level)
+            for confidence_level in self.confidence_to_coefficient.keys()
+        }
 
-def calculate_sample_coefficient_of_variation(
-    sample_mean: Decimal, sample_standard_deviation: Decimal
-) -> Decimal:
-    return sample_standard_deviation / sample_mean
+    def calculate_mean(self) -> Decimal:
+        return Decimal(sum(self.sequence_sample) / len(self.sequence_sample))
 
+    def calculate_dispersion(self) -> Decimal:
+        return Decimal(
+            sum((element - self.mean) ** 2 for element in self.sequence_sample)
+            / (self.size - 1)
+        )
 
-confidence_to_coefficient: dict[Decimal, Decimal] = {
-    Decimal(0.90): Decimal(1.645),
-    Decimal(0.95): Decimal(1.960),
-    Decimal(0.99): Decimal(2.576),
-}
+    def calculate_standard_deviation(self) -> Decimal:
+        return self.dispersion.sqrt()
 
+    def calculate_coefficient_of_variation(self) -> Decimal:
+        return self.standard_deviation / self.mean
 
-def calculate_confidence_interval(
-    confidence_level: Decimal, sample_standard_deviation: Decimal, sample_size: int
-) -> Decimal:
-    return (
-        confidence_to_coefficient[confidence_level]
-        * sample_standard_deviation
-        / Decimal(sample_size).sqrt()
-    )
+    def calculate_confidence_interval(
+        self, confidence_level: ConfidenceLevel
+    ) -> Decimal:
+        return (
+            self.confidence_to_coefficient[confidence_level]
+            * self.standard_deviation
+            / Decimal(self.size).sqrt()
+        )
 
 
 if __name__ == "__main__":
@@ -59,22 +70,12 @@ if __name__ == "__main__":
         raise ValueError(f"Sequence should be {SAMPLE_SIZES[-1]} numbers")
 
     for sample_size in SAMPLE_SIZES:
-        sample_sequence = full_sequence[:sample_size]
-        sample_mean = calculate_sample_mean(sample_sequence)
-        sample_dispersion = calculate_sample_dispersion(sample_sequence, sample_mean)
-        sample_standard_deviation = calculate_sample_standard_deviation(
-            sample_dispersion
-        )
-        sample_coefficient_of_variation = calculate_sample_coefficient_of_variation(
-            sample_mean, sample_standard_deviation
-        )
-        confidences = {
-            confidence_level: calculate_confidence_interval(
-                confidence_level, sample_standard_deviation, sample_size
-            )
-            for confidence_level in confidence_to_coefficient.keys()
-        }
+        analyzer = SequenceSampleAnalyzer(full_sequence[:sample_size])
         print(
-            sample_size,
-            *confidences.values(),
+            analyzer.size,
+            analyzer.mean,
+            analyzer.dispersion,
+            analyzer.standard_deviation,
+            analyzer.coefficient_of_variation,
+            analyzer.confidences,
         )
