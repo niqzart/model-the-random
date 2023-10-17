@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import csv
-from collections.abc import Callable
+from collections import deque
+from collections.abc import Callable, Iterable
 from decimal import Decimal
 from pathlib import Path
 from typing import IO, Any, Final, Literal
@@ -68,6 +69,19 @@ class SequenceSampleAnalyzer:
             / Decimal(self.size).sqrt()
         )
 
+    def calculate_autocovariation(self, shift: int) -> Decimal:
+        rotated = deque(self.sequence_sample, self.size)
+        rotated.rotate(-shift)
+        return Decimal(
+            sum(
+                (normal - self.mean) * (shifted - self.mean)
+                for normal, shifted in zip(self.sequence_sample, rotated)
+            )
+        )
+
+    def calculate_autocorrelation(self, shift: int) -> Decimal:
+        return self.calculate_autocovariation(shift) / self.dispersion / self.size
+
 
 class RelativeSequenceSampleAnalyzer(SequenceSampleAnalyzer):
     @classmethod
@@ -99,14 +113,22 @@ class RelativeSequenceSampleAnalyzer(SequenceSampleAnalyzer):
         }
 
 
-class Table1Writer:
+class BaseWriter:
+    def __init__(self, f: IO[str]) -> None:
+        self.writer = csv.writer(f, delimiter=",", lineterminator="\n")
+
+    def writerow(self, row: Iterable[Any]) -> None:
+        self.writer.writerow(row)
+
+
+class Table1Writer(BaseWriter):
     def __init__(
         self,
         f: IO[str],
         partial_analyzers: list[RelativeSequenceSampleAnalyzer],
         full_analyzer: SequenceSampleAnalyzer,
     ) -> None:
-        self.writer = csv.writer(f, delimiter=",", lineterminator="\n")
+        super().__init__(f)
         self.partial_analyzers = partial_analyzers
         self.all_analyzers: tuple[SequenceSampleAnalyzer, ...] = (
             *partial_analyzers,
@@ -114,15 +136,13 @@ class Table1Writer:
         )
 
     def write_from_all(self, accessor: Callable[[SequenceSampleAnalyzer], Any]) -> None:
-        self.writer.writerow([accessor(analyzer) for analyzer in self.all_analyzers])
+        self.writerow([accessor(analyzer) for analyzer in self.all_analyzers])
 
     def write_from_partial(
         self,
         accessor: Callable[[RelativeSequenceSampleAnalyzer], Any],
     ) -> None:
-        self.writer.writerow(
-            [accessor(analyzer) for analyzer in self.partial_analyzers]
-        )
+        self.writerow([accessor(analyzer) for analyzer in self.partial_analyzers])
 
 
 def save_table1_to_csv(
@@ -157,6 +177,13 @@ def save_table1_to_csv(
         writer.write_from_partial(
             lambda analyzer: analyzer.relative_coefficient_of_variation
         )
+
+
+def save_table2_to_csv(autocorrelation_coefficients: list[Decimal]) -> None:
+    with (ROOT_FOLDER / "out" / "table2.csv").open("w", encoding="utf-8") as f:
+        writer = BaseWriter(f)
+        writer.writerow(i + 1 for i in range(len(autocorrelation_coefficients)))
+        writer.writerow(coefficient for coefficient in autocorrelation_coefficients)
 
 
 def plot_line_graph(sequence_of_floats: list[float]) -> None:
@@ -199,6 +226,12 @@ if __name__ == "__main__":
         for sample_size in SAMPLE_SIZES[:-1]
     ]
     save_table1_to_csv(partial_analyzers, full_analyzer)
+
+    # autocorrelation analysis
+    autocorrelation_coefficients = [
+        full_analyzer.calculate_autocorrelation(i) for i in range(1, 11)
+    ]
+    save_table2_to_csv(autocorrelation_coefficients)
 
     # plot source sequence
     sequence_of_floats = [float(element) for element in full_sequence]

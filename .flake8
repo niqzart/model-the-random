@@ -27,7 +27,7 @@ extend-ignore =
   WPS428  # fails to understand overloading
   WPS601  # fails to same-name class and instance attributes (pydantic & sqlalchemy)
   # to many
-  WPS201 WPS210 WPS213 WPS214 WPS217 WPS218 WPS221 WPS230
+  WPS201 WPS202 WPS210 WPS213 WPS214 WPS217 WPS218 WPS221 WPS230
 
   # don't block features
   WPS100  # utils is a module name
