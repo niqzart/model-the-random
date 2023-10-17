@@ -27,7 +27,7 @@ extend-ignore =
   WPS428  # fails to understand overloading
   WPS601  # fails to same-name class and instance attributes (pydantic & sqlalchemy)
   # to many
-  WPS201 WPS210 WPS214 WPS217 WPS218 WPS221 WPS230
+  WPS201 WPS210 WPS213 WPS214 WPS217 WPS218 WPS221 WPS230
 
   # don't block features
   WPS100  # utils is a module name
@@ -35,6 +35,7 @@ extend-ignore =
   WPS306  # python 2.x is deprecated
   WPS339  # meaningless zeroes go brrrrrrr
   WPS420 WPS604  # pass is a thing
+  WPS426  # lambda in loop body
   WPS430  # nested functions
   WPS451  # positional-only arguments
   WPS501  # try-finally with no except

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import csv
+from collections.abc import Callable
 from decimal import Decimal
 from pathlib import Path
-from typing import Final, Literal
+from typing import IO, Any, Final, Literal
 
 ROOT_FOLDER: Path = Path.cwd()
 if ROOT_FOLDER.name == "app":
@@ -96,34 +97,76 @@ class RelativeSequenceSampleAnalyzer(SequenceSampleAnalyzer):
         }
 
 
+class Table1Writer:
+    def __init__(
+        self,
+        f: IO[str],
+        partial_analyzers: list[RelativeSequenceSampleAnalyzer],
+        full_analyzer: SequenceSampleAnalyzer,
+    ) -> None:
+        self.writer = csv.writer(f, delimiter=",", lineterminator="\n")
+        self.partial_analyzers = partial_analyzers
+        self.all_analyzers: tuple[SequenceSampleAnalyzer, ...] = (
+            *partial_analyzers,
+            full_analyzer,
+        )
+
+    def write_from_all(self, accessor: Callable[[SequenceSampleAnalyzer], Any]) -> None:
+        self.writer.writerow([accessor(analyzer) for analyzer in self.all_analyzers])
+
+    def write_from_partial(
+        self,
+        accessor: Callable[[RelativeSequenceSampleAnalyzer], Any],
+    ) -> None:
+        self.writer.writerow(
+            [accessor(analyzer) for analyzer in self.partial_analyzers]
+        )
+
+
+def save_table1_to_csv(
+    partial_analyzers: list[RelativeSequenceSampleAnalyzer],
+    full_analyzer: SequenceSampleAnalyzer,
+) -> None:
+    with (ROOT_FOLDER / "out" / "table1.csv").open("w", encoding="utf-8") as f:
+        writer = Table1Writer(f, partial_analyzers, full_analyzer)
+
+        writer.write_from_all(lambda analyzer: analyzer.size)
+
+        writer.write_from_all(lambda analyzer: analyzer.mean)
+        writer.write_from_partial(lambda analyzer: analyzer.relative_mean)
+
+        for confidence_level in SequenceSampleAnalyzer.confidence_to_coefficient.keys():
+            writer.write_from_all(
+                lambda analyzer: analyzer.confidences[confidence_level]  # noqa: B023
+            )
+            writer.write_from_partial(
+                lambda analyzer: analyzer.relative_confidences[
+                    confidence_level  # noqa: B023
+                ]
+            )
+
+        writer.write_from_all(lambda analyzer: analyzer.dispersion)
+        writer.write_from_partial(lambda analyzer: analyzer.relative_dispersion)
+
+        writer.write_from_all(lambda analyzer: analyzer.standard_deviation)
+        writer.write_from_partial(lambda analyzer: analyzer.relative_standard_deviation)
+
+        writer.write_from_all(lambda analyzer: analyzer.coefficient_of_variation)
+        writer.write_from_partial(
+            lambda analyzer: analyzer.relative_coefficient_of_variation
+        )
+
+
 if __name__ == "__main__":
     full_sequence = load_sequence_from_file()
     if len(full_sequence) != SAMPLE_SIZES[-1]:
         raise ValueError(f"Sequence should be {SAMPLE_SIZES[-1]} numbers")
 
-    full_analyzer = SequenceSampleAnalyzer(full_sequence)
-    for sample_size in SAMPLE_SIZES[:-1]:
-        analyzer = RelativeSequenceSampleAnalyzer(
-            full_sequence[:sample_size], full_analyzer
-        )
-        print(
-            analyzer.size,
-            analyzer.mean,
-            analyzer.relative_mean,
-            analyzer.dispersion,
-            analyzer.relative_dispersion,
-            analyzer.standard_deviation,
-            analyzer.relative_standard_deviation,
-            analyzer.coefficient_of_variation,
-            analyzer.relative_coefficient_of_variation,
-            analyzer.confidences,
-            analyzer.relative_confidences,
-        )
-    print(
-        full_analyzer.size,
-        full_analyzer.mean,
-        full_analyzer.dispersion,
-        full_analyzer.standard_deviation,
-        full_analyzer.coefficient_of_variation,
-        full_analyzer.confidences,
-    )
+    (ROOT_FOLDER / "out").mkdir(exist_ok=True)
+
+    full_analyzer: SequenceSampleAnalyzer = SequenceSampleAnalyzer(full_sequence)
+    partial_analyzers: list[RelativeSequenceSampleAnalyzer] = [
+        RelativeSequenceSampleAnalyzer(full_sequence[:sample_size], full_analyzer)
+        for sample_size in SAMPLE_SIZES[:-1]
+    ]
+    save_table1_to_csv(partial_analyzers, full_analyzer)
