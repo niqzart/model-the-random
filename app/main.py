@@ -35,6 +35,23 @@ def calculate_sample_coefficient_of_variation(
     return sample_standard_deviation / sample_mean
 
 
+confidence_to_coefficient: dict[Decimal, Decimal] = {
+    Decimal(0.90): Decimal(1.645),
+    Decimal(0.95): Decimal(1.960),
+    Decimal(0.99): Decimal(2.576),
+}
+
+
+def calculate_confidence_interval(
+    confidence_level: Decimal, sample_standard_deviation: Decimal, sample_size: int
+) -> Decimal:
+    return (
+        confidence_to_coefficient[confidence_level]
+        * sample_standard_deviation
+        / Decimal(sample_size).sqrt()
+    )
+
+
 if __name__ == "__main__":
     full_sequence = load_sequence_from_file()
     if len(full_sequence) != SAMPLE_SIZES[-1]:
@@ -50,10 +67,13 @@ if __name__ == "__main__":
         sample_coefficient_of_variation = calculate_sample_coefficient_of_variation(
             sample_mean, sample_standard_deviation
         )
+        confidences = {
+            confidence_level: calculate_confidence_interval(
+                confidence_level, sample_standard_deviation, sample_size
+            )
+            for confidence_level in confidence_to_coefficient.keys()
+        }
         print(
             sample_size,
-            sample_mean,
-            sample_dispersion,
-            sample_standard_deviation,
-            sample_coefficient_of_variation,
+            *confidences.values(),
         )
