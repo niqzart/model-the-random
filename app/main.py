@@ -6,7 +6,7 @@ from collections.abc import Callable, Iterable
 from decimal import Decimal
 from math import ceil
 from pathlib import Path
-from random import random
+from random import random, seed
 from typing import IO, Any, Final, Literal
 
 from matplotlib import pyplot as plt
@@ -174,6 +174,21 @@ class Table1Writer(BaseWriter):
         self.writerow([accessor(analyzer) for analyzer in self.partial_analyzers])
 
 
+class Table2Writer(BaseWriter):
+    def __init__(
+        self,
+        f: IO[str],
+        analyzers: list[RelativeSequenceSampleAnalyzer],
+    ) -> None:
+        super().__init__(f)
+        self.analyzers = analyzers
+
+    def write_from_all(
+        self, accessor: Callable[[RelativeSequenceSampleAnalyzer], Any]
+    ) -> None:
+        self.writerow([accessor(analyzer) for analyzer in self.analyzers])
+
+
 def save_table1_to_csv(
     partial_analyzers: list[RelativeSequenceSampleAnalyzer],
     full_analyzer: SequenceSampleAnalyzer,
@@ -208,8 +223,31 @@ def save_table1_to_csv(
         )
 
 
-def save_table2_to_csv(autocorrelation_coefficients: list[Decimal]) -> None:
+def save_table2_to_csv(analyzers: list[RelativeSequenceSampleAnalyzer]) -> None:
     with (ROOT_FOLDER / "out" / "table2.csv").open("w", encoding="utf-8") as f:
+        writer = Table2Writer(f, analyzers)
+        for accessor in (
+            lambda analyzer: analyzer.size,
+            lambda analyzer: analyzer.mean,
+            lambda analyzer: analyzer.relative_mean,
+            lambda analyzer: analyzer.confidences["0.90"],
+            lambda analyzer: analyzer.relative_confidences["0.90"],
+            lambda analyzer: analyzer.confidences["0.95"],
+            lambda analyzer: analyzer.relative_confidences["0.95"],
+            lambda analyzer: analyzer.confidences["0.99"],
+            lambda analyzer: analyzer.relative_confidences["0.99"],
+            lambda analyzer: analyzer.dispersion,
+            lambda analyzer: analyzer.relative_dispersion,
+            lambda analyzer: analyzer.standard_deviation,
+            lambda analyzer: analyzer.relative_standard_deviation,
+            lambda analyzer: analyzer.coefficient_of_variation,
+            lambda analyzer: analyzer.relative_coefficient_of_variation,
+        ):
+            writer.write_from_all(accessor)
+
+
+def save_table3_to_csv(*data: list[Decimal]) -> None:
+    with (ROOT_FOLDER / "out" / "table3.csv").open("w", encoding="utf-8") as f:
         writer = BaseWriter(f)
         writer.writerow(i + 1 for i in range(len(autocorrelation_coefficients)))
         writer.writerow(coefficient for coefficient in autocorrelation_coefficients)
@@ -221,7 +259,7 @@ def generate_erlang(a: Decimal, k: int) -> Decimal:
 
 if __name__ == "__main__":
     # setup
-    # TODO random.seed
+    seed(53)
     (ROOT_FOLDER / "out").mkdir(exist_ok=True)
     full_sequence = load_sequence_from_file()
     if len(full_sequence) != SAMPLE_SIZES[-1]:
@@ -244,7 +282,7 @@ if __name__ == "__main__":
     autocorrelation_coefficients = [
         full_analyzer.calculate_autocorrelation(i) for i in range(1, 11)
     ]
-    save_table2_to_csv(autocorrelation_coefficients)
+    save_table3_to_csv(autocorrelation_coefficients)
 
     # detect distribution type & generate new sequence
     variation = full_analyzer.coefficient_of_variation
@@ -262,3 +300,18 @@ if __name__ == "__main__":
         print("Detected exponential distribution")
     else:  # TODO hyperexponential
         print("Detected hyperexponential distribution")
+
+    # plot generated sequence
+    sequence_of_floats = [float(element) for element in generated_sequence]
+    plot_line_graph(sequence_of_floats, "result-line-graph")
+    plot_histogram(sequence_of_floats, "result-histogram")
+
+    # analyze generated sequence
+    source_analyzers = (*partial_analyzers, full_analyzer)
+    analyzers: list[RelativeSequenceSampleAnalyzer] = [
+        RelativeSequenceSampleAnalyzer(
+            generated_sequence[:sample_size], source_analyzers[i]
+        )
+        for i, sample_size in enumerate(SAMPLE_SIZES)
+    ]
+    save_table2_to_csv(analyzers)
