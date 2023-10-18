@@ -112,29 +112,29 @@ class SequenceSampleAnalyzer:
         return self.calculate_autocovariation(shift) / self.dispersion / self.size
 
 
-class RelativeSequenceSampleAnalyzer(SequenceSampleAnalyzer):
-    @classmethod
-    def calculate_relative(cls, current: Decimal, base: Decimal) -> Decimal:
-        return (abs(current - base) / base) * 100
+def calculate_relative(current: Decimal, base: Decimal) -> Decimal:
+    return Decimal((abs(current - base) / abs(base)) * 100)
 
+
+class RelativeSequenceSampleAnalyzer(SequenceSampleAnalyzer):
     def __init__(
         self, sequence_sample: list[Decimal], relative_to: SequenceSampleAnalyzer
     ) -> None:
         super().__init__(sequence_sample)
         self.relative_to = relative_to
 
-        self.relative_mean = self.calculate_relative(self.mean, relative_to.mean)
-        self.relative_dispersion = self.calculate_relative(
+        self.relative_mean = calculate_relative(self.mean, relative_to.mean)
+        self.relative_dispersion = calculate_relative(
             self.dispersion, relative_to.dispersion
         )
-        self.relative_standard_deviation = self.calculate_relative(
+        self.relative_standard_deviation = calculate_relative(
             self.standard_deviation, relative_to.standard_deviation
         )
-        self.relative_coefficient_of_variation = self.calculate_relative(
+        self.relative_coefficient_of_variation = calculate_relative(
             self.coefficient_of_variation, relative_to.coefficient_of_variation
         )
         self.relative_confidences: dict[ConfidenceLevel, Decimal] = {
-            confidence_level: self.calculate_relative(
+            confidence_level: calculate_relative(
                 self.confidences[confidence_level],
                 relative_to.confidences[confidence_level],
             )
@@ -249,8 +249,9 @@ def save_table2_to_csv(analyzers: list[RelativeSequenceSampleAnalyzer]) -> None:
 def save_table3_to_csv(*data: list[Decimal]) -> None:
     with (ROOT_FOLDER / "out" / "table3.csv").open("w", encoding="utf-8") as f:
         writer = BaseWriter(f)
-        writer.writerow(i + 1 for i in range(len(autocorrelation_coefficients)))
-        writer.writerow(coefficient for coefficient in autocorrelation_coefficients)
+        writer.writerow(i + 1 for i in range(len(data[0])))
+        for autocorrelation_coefficients in data:
+            writer.writerow(coefficient for coefficient in autocorrelation_coefficients)
 
 
 def generate_erlang(a: Decimal, k: int) -> Decimal:
@@ -277,12 +278,6 @@ if __name__ == "__main__":
         for sample_size in SAMPLE_SIZES[:-1]
     ]
     save_table1_to_csv(partial_analyzers, full_analyzer)
-
-    # analyze autocorrelation for source sequence
-    autocorrelation_coefficients = [
-        full_analyzer.calculate_autocorrelation(i) for i in range(1, 11)
-    ]
-    save_table3_to_csv(autocorrelation_coefficients)
 
     # detect distribution type & generate new sequence
     variation = full_analyzer.coefficient_of_variation
@@ -315,3 +310,20 @@ if __name__ == "__main__":
         for i, sample_size in enumerate(SAMPLE_SIZES)
     ]
     save_table2_to_csv(analyzers)
+
+    # analyze autocorrelation for both sequences
+    source_autocorrelation = [
+        full_analyzer.calculate_autocorrelation(i) for i in range(1, 11)
+    ]
+    generated_autocorrelation = [
+        analyzers[-1].calculate_autocorrelation(i) for i in range(1, 11)
+    ]
+    relative_autocorrelation = [
+        calculate_relative(generated, source)
+        for source, generated in zip(source_autocorrelation, generated_autocorrelation)
+    ]
+    save_table3_to_csv(
+        source_autocorrelation,
+        generated_autocorrelation,
+        relative_autocorrelation,
+    )
