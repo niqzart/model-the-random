@@ -24,7 +24,7 @@ def load_sequence_from_file() -> list[Decimal]:
         return [Decimal(row[0]) for row in csv.reader(f)]
 
 
-def plot_line_graph(sequence_of_floats: list[float], name: str) -> None:
+def plot_line_graph(sequence_of_floats: list[Any], name: str) -> None:
     plt.figure(figsize=(10, 5))
     plt.plot(sequence_of_floats)
     plt.xlim(0, len(sequence_of_floats))
@@ -279,6 +279,14 @@ if __name__ == "__main__":
     ]
     save_table1_to_csv(partial_analyzers, full_analyzer)
 
+    # analyze autocorrelation for source sequence
+    source_autocorrelation = [
+        full_analyzer.calculate_autocorrelation(i) for i in range(1, 11)
+    ]
+    plot_line_graph(
+        [None] + [float(e) for e in source_autocorrelation], "autocorrelation"
+    )
+
     # detect distribution type & generate new sequence
     variation = full_analyzer.coefficient_of_variation
     if variation < EPSILON:  # TODO deterministic
@@ -311,10 +319,7 @@ if __name__ == "__main__":
     ]
     save_table2_to_csv(analyzers)
 
-    # analyze autocorrelation for both sequences
-    source_autocorrelation = [
-        full_analyzer.calculate_autocorrelation(i) for i in range(1, 11)
-    ]
+    # analyze autocorrelation for generated sequence
     generated_autocorrelation = [
         analyzers[-1].calculate_autocorrelation(i) for i in range(1, 11)
     ]
