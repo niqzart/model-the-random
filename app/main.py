@@ -4,7 +4,9 @@ import csv
 from collections import deque
 from collections.abc import Callable, Iterable
 from decimal import Decimal
+from math import ceil
 from pathlib import Path
+from random import random
 from typing import IO, Any, Final, Literal
 
 from matplotlib import pyplot as plt
@@ -13,12 +15,39 @@ ROOT_FOLDER: Path = Path.cwd()
 if ROOT_FOLDER.name == "app":
     ROOT_FOLDER = ROOT_FOLDER.parent
 
+EPSILON: Decimal = Decimal("0.0001")
 SAMPLE_SIZES: Final[tuple[int, ...]] = (10, 20, 50, 100, 200, 300)
 
 
 def load_sequence_from_file() -> list[Decimal]:
     with (ROOT_FOLDER / "data" / "sequence.csv").open(encoding="utf-8") as f:
         return [Decimal(row[0]) for row in csv.reader(f)]
+
+
+def plot_line_graph(sequence_of_floats: list[float], name: str) -> None:
+    plt.figure(figsize=(10, 5))
+    plt.plot(sequence_of_floats)
+    plt.xlim(0, len(sequence_of_floats))
+    plt.xlabel("Number")
+    plt.ylabel("Value")
+    plt.title("Plot")
+    plt.savefig(ROOT_FOLDER / "out" / f"{name}.png")
+    plt.cla()
+
+
+def plot_histogram(sequence_of_floats: list[float], name: str) -> None:
+    plt.hist(
+        x=sequence_of_floats,
+        bins="auto",
+        rwidth=0.85,
+        range=(0, max(sequence_of_floats)),
+    )
+    plt.grid(axis="y")
+    plt.xlabel("Value")
+    plt.ylabel("Count")
+    plt.title("Histogram")
+    plt.savefig(ROOT_FOLDER / "out" / f"{name}.png")
+    plt.cla()
 
 
 ConfidenceLevel = Literal["0.90", "0.95", "0.99"]
@@ -186,38 +215,22 @@ def save_table2_to_csv(autocorrelation_coefficients: list[Decimal]) -> None:
         writer.writerow(coefficient for coefficient in autocorrelation_coefficients)
 
 
-def plot_line_graph(sequence_of_floats: list[float]) -> None:
-    plt.figure(figsize=(10, 5))
-    plt.plot(sequence_of_floats)
-    plt.xlim(0, len(sequence_of_floats))
-    plt.xlabel("Number")
-    plt.ylabel("Value")
-    plt.title("Plot")
-    plt.savefig(ROOT_FOLDER / "out" / "line-graph.png")
-    plt.cla()
-
-
-def plot_histogram(sequence_of_floats: list[float]) -> None:
-    plt.hist(
-        x=sequence_of_floats,
-        bins="auto",
-        rwidth=0.85,
-        range=(0, max(sequence_of_floats)),
-    )
-    plt.grid(axis="y")
-    plt.xlabel("Value")
-    plt.ylabel("Count")
-    plt.title("Histogram")
-    plt.savefig(ROOT_FOLDER / "out" / "histogram.png")
-    plt.cla()
+def generate_erlang(a: Decimal, k: int) -> Decimal:
+    return Decimal(-(1 / a) * sum(Decimal(random()).ln() for _ in range(k)))
 
 
 if __name__ == "__main__":
     # setup
+    # TODO random.seed
     (ROOT_FOLDER / "out").mkdir(exist_ok=True)
     full_sequence = load_sequence_from_file()
     if len(full_sequence) != SAMPLE_SIZES[-1]:
         raise ValueError(f"Sequence should be {SAMPLE_SIZES[-1]} numbers")
+
+    # plot source sequence
+    sequence_of_floats = [float(element) for element in full_sequence]
+    plot_line_graph(sequence_of_floats, "source-line-graph")
+    plot_histogram(sequence_of_floats, "source-histogram")
 
     # analyze source sequence
     full_analyzer: SequenceSampleAnalyzer = SequenceSampleAnalyzer(full_sequence)
@@ -227,13 +240,25 @@ if __name__ == "__main__":
     ]
     save_table1_to_csv(partial_analyzers, full_analyzer)
 
-    # autocorrelation analysis
+    # analyze autocorrelation for source sequence
     autocorrelation_coefficients = [
         full_analyzer.calculate_autocorrelation(i) for i in range(1, 11)
     ]
     save_table2_to_csv(autocorrelation_coefficients)
 
-    # plot source sequence
-    sequence_of_floats = [float(element) for element in full_sequence]
-    plot_line_graph(sequence_of_floats)
-    plot_histogram(sequence_of_floats)
+    # detect distribution type & generate new sequence
+    variation = full_analyzer.coefficient_of_variation
+    if variation < EPSILON:  # TODO deterministic
+        print("Detected deterministic variable")
+    elif variation < 1 - EPSILON:  # erlang distribution
+        k_full = 1 / (variation**2)
+        k = ceil(k_full)
+        a = k / full_analyzer.mean
+        print(f"Detected erlang-{k} distribution")
+        print(f"Parameter k: {k_full}")
+        print(f"Parameter a: {a}")
+        generated_sequence = [generate_erlang(a, k) for _ in range(300)]
+    elif variation < 1 + EPSILON:  # TODO exponential
+        print("Detected exponential distribution")
+    else:  # TODO hyperexponential
+        print("Detected hyperexponential distribution")

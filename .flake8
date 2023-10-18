@@ -46,3 +46,4 @@ extend-ignore =
 
   # project specific
   WPS421 T201  # prints are needed for CLI
+  S311  # no security/cryptographic purposes intended
