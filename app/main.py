@@ -109,7 +109,18 @@ class SequenceSampleAnalyzer:
         )
 
     def calculate_autocorrelation(self, shift: int) -> Decimal:
-        return self.calculate_autocovariation(shift) / self.dispersion / self.size
+        return self.calculate_autocovariation(shift) / self.dispersion / (self.size - 1)
+
+    def calculate_correlation(self, other: SequenceSampleAnalyzer) -> Decimal:
+        return Decimal(
+            sum(
+                (a - self.mean) * (b - other.mean)
+                for a, b in zip(self.sequence_sample, other.sequence_sample)
+            )
+            / Decimal(
+                self.dispersion * other.dispersion * (self.size - 1) * (other.size - 1)
+            ).sqrt()
+        )
 
 
 def calculate_relative(current: Decimal, base: Decimal) -> Decimal:
@@ -331,4 +342,10 @@ if __name__ == "__main__":
         source_autocorrelation,
         generated_autocorrelation,
         relative_autocorrelation,
+    )
+
+    # source to generated correlation
+    print(
+        "Correlation from generator:",
+        full_analyzer.calculate_correlation(analyzers[-1]),
     )
